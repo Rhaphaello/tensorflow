@@ -80,6 +80,8 @@ class PyBuffer {
 
   StatusOr<pybind11::object> CopyToDevice(
       const ClientAndPtr<PjRtDevice>& dst_device) const;
+  std::pair<Status, bool> CopyToRemoteDevice(
+      absl::string_view serialized_descriptor) const;
 
   StatusOr<size_t> OnDeviceSizeInBytes() {
     return buffer_->GetOnDeviceSizeInBytes();
@@ -140,7 +142,7 @@ class PyBuffer {
     TF_RET_CHECK(sticky_device == nullptr ||
                  sticky_device == buffer_->device());
     sticky_device_ = sticky_device;
-    return Status::OK();
+    return ::tensorflow::OkStatus();
   }
   PjRtDevice* sticky_device() const { return sticky_device_; }
 

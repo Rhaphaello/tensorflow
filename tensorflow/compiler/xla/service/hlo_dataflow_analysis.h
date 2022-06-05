@@ -70,7 +70,7 @@ class HloDataflowAnalysis {
   // The first parameter of the function should be the instruction, the
   // second parameter should be an operand of the instruction. The third
   // parameter should be the output index of the instruction.
-  using CanShareBuffer = std::function<absl::optional<bool>(
+  using CanShareBuffer = std::function<std::optional<bool>(
       const HloInstruction* instr, const HloInstruction* operand,
       const ShapeIndex& user_index)>;
 
@@ -262,7 +262,6 @@ class HloDataflowAnalysis {
   bool UpdateCopyDoneValueSet(HloInstruction* copy_done);
   bool UpdateOptimizationBarrierValueSet(HloInstruction* barrier);
   bool UpdateRecvDoneValueSet(HloInstruction* recv_done);
-  bool UpdateTupleSelectValueSet(HloInstruction* select);
   bool UpdateSendValueSet(HloInstruction* send);
   bool UpdateSetDimensionSizeValueSet(HloInstruction* set_dimension_size);
   bool UpdateTupleValueSet(HloInstruction* tuple);

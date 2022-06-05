@@ -21,6 +21,7 @@ limitations under the License.
 #include <iterator>
 #include <numeric>
 
+#include "mlir/Dialect/Quant/QuantOps.h"  // from @llvm-project
 #include "mlir/Dialect/Tosa/IR/TosaOps.h"  // from @llvm-project
 #include "mlir/Support/LLVM.h"  // from @llvm-project
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"  // from @llvm-project
@@ -35,8 +36,6 @@ limitations under the License.
 namespace mlir {
 namespace tosa {
 namespace {
-#define GEN_PASS_CLASSES
-#include "tensorflow/compiler/mlir/tosa/transforms/passes.h.inc"
 
 // Performs lowering to TOSA dialect
 class LegalizeTF : public TosaLegalizeTFPassBase<LegalizeTF> {
@@ -2352,7 +2351,7 @@ void populateLegalizeTFPatterns(MLIRContext* ctx, RewritePatternSet& patterns) {
 }
 
 // Creates an instance of the TensorFlow dialect LegalizeTF pass.
-std::unique_ptr<OperationPass<FuncOp>> createLegalizeTFPass() {
+std::unique_ptr<OperationPass<func::FuncOp>> createLegalizeTFPass() {
   return std::make_unique<LegalizeTF>();
 }
 

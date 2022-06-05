@@ -33,9 +33,9 @@ from tensorflow.python.ops import resource_variable_ops
 from tensorflow.python.ops import state_ops
 from tensorflow.python.ops import variables
 from tensorflow.python.platform import tf_logging as logging
+from tensorflow.python.trackable import base as trackable
+from tensorflow.python.trackable import trackable_utils
 from tensorflow.python.training.saving import saveable_object
-from tensorflow.python.training.tracking import base as trackable
-from tensorflow.python.training.tracking import trackable_utils
 from tensorflow.python.util import nest
 from tensorflow.python.util import object_identity
 from tensorflow.python.util.tf_export import tf_export
@@ -100,7 +100,8 @@ class ResourceVariableSaveable(saveable_object.SaveableObject):
               # A SaveSpec tensor value of `None` indicates that the variable is
               # uninitialized.
               return None
-            x = v.read_value()
+            # Read the variable without making a copy to limit memory usage.
+            x = v.read_value_no_copy()
             # To allow variables placed on non-CPU devices to be checkpointed,
             # we copy them to CPU on the same machine first.
             with ops.device("/device:CPU:0"):
@@ -374,7 +375,7 @@ def trace_save_restore_functions(saveable_factory, obj):
             saveable_factory.keywords["restore_function"])
 
   saveables = []  # Store the saveables in a data structure accessible to both
-                  # the save and restore functions.
+  # the save and restore functions.
 
   @def_function.function(
       input_signature=[tensor_spec.TensorSpec([], dtypes.string)])

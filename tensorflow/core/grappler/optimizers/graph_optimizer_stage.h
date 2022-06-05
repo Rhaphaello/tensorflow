@@ -150,7 +150,7 @@ class GraphOptimizerStage {
   // (TrySimplify), and make virtual implementation protected.
   Status EnsureNodeIsSupported(const NodeDef* node) const {
     return IsSupported(node)
-               ? Status::OK()
+               ? OkStatus()
                : errors::InvalidArgument(
                      "Node ", node->name(), " is not supported by optimizer ",
                      optimizer_name_, " and stage ", stage_name_);
@@ -288,16 +288,18 @@ class GraphOptimizerStagePipeline {
         break;
       }
     }
-    return Status::OK();
+    return OkStatus();
   }
 
   std::size_t NumStages() { return stages_.size(); }
 
   std::vector<string> StageNames() {
     std::vector<string> names;
-    for (const auto& stage : stages_) {
-      names.push_back(stage->stage_name());
-    }
+    std::transform(
+        stages_.begin(), stages_.end(), std::back_inserter(names),
+        [](const std::unique_ptr<GraphOptimizerStage<Result>>& stage) {
+          return stage->stage_name();
+        });
     return names;
   }
 

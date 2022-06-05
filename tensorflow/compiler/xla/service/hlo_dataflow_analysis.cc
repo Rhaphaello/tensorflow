@@ -154,7 +154,7 @@ struct ConcatUsageInfo {
 // Returns an optional concat usage info to denote whether the concat is used in
 // an elementwise manner. A concat followed by slices is considered effectively
 // elementwise if the slices combinedly is a reverse function of the concat.
-absl::optional<ConcatUsageInfo> ConcatIsEffectivelyElementwise(
+std::optional<ConcatUsageInfo> ConcatIsEffectivelyElementwise(
     const HloInstruction& concat, const HloInstruction& operand,
     const ConcatUsageInfo& info) {
   // First, check if this concat is in the below pattern. Also, we check
@@ -168,12 +168,12 @@ absl::optional<ConcatUsageInfo> ConcatIsEffectivelyElementwise(
   std::vector<HloInstruction*> users = concat.users();
   if (!absl::c_all_of(users, Is1dSliceWithoutStrides)) {
     // Limit our supported cases to 1 dimensional slices.
-    return absl::optional<ConcatUsageInfo>();
+    return std::optional<ConcatUsageInfo>();
   }
   // Verify that each operand to the concat is reversed by a slice.
   if (users.size() != concat.operand_count() ||
       concat.operand_count() != concat.unique_operands().size()) {
-    return absl::optional<ConcatUsageInfo>();
+    return std::optional<ConcatUsageInfo>();
   }
   absl::c_sort(users, [](const HloInstruction* a, const HloInstruction* b) {
     return a->slice_starts().at(0) < b->slice_starts().at(0);
@@ -184,7 +184,7 @@ absl::optional<ConcatUsageInfo> ConcatIsEffectivelyElementwise(
     int64_t slice_size = u->slice_limits().at(0) - u->slice_starts().at(0);
     if (u->slice_starts().at(0) != prev_limit ||
         slice_size != ShapeUtil::ElementsIn(concat.operand(i)->shape())) {
-      return absl::optional<ConcatUsageInfo>();
+      return std::optional<ConcatUsageInfo>();
     }
     prev_limit = u->slice_limits().at(0);
   }
@@ -203,12 +203,12 @@ absl::optional<ConcatUsageInfo> ConcatIsEffectivelyElementwise(
           return true;
         });
     if (!is_concat_identical || info.concat_opnd_idx != operand_idx) {
-      return absl::optional<ConcatUsageInfo>();
+      return std::optional<ConcatUsageInfo>();
     }
   }
 
   const HloInstruction* slice_to_recover_opnd = users.at(operand_idx);
-  return absl::optional<ConcatUsageInfo>(
+  return std::optional<ConcatUsageInfo>(
       ConcatUsageInfo{&concat, operand_idx, slice_to_recover_opnd});
 }
 
@@ -250,7 +250,7 @@ bool AreTransitiveUsesEffectivelyElementwise(const HloInstruction* param,
           }
           break;
         case HloOpcode::kConcatenate: {
-          absl::optional<ConcatUsageInfo> optional_concat_info =
+          std::optional<ConcatUsageInfo> optional_concat_info =
               ConcatIsEffectivelyElementwise(*user, *current,
                                              concat_usage_info);
           if (!optional_concat_info) {
@@ -922,27 +922,6 @@ bool HloDataflowAnalysis::UpdateParameterValueSet(HloInstruction* parameter) {
   }
 }
 
-bool HloDataflowAnalysis::UpdateTupleSelectValueSet(HloInstruction* select) {
-  CHECK_EQ(select->opcode(), HloOpcode::kTupleSelect);
-  // A phi value is not defined at a kTupleSelect instruction because
-  // kTupleSelect does not create a new value. Rather it forwards a value from
-  // its operands. This contrasts with kWhile instruction (which does define a
-  // phi value) which has in-place update semantics.
-  bool changed = false;
-  for (auto& pair : GetInstructionValueSet(select)) {
-    const ShapeIndex& index = pair.first;
-    if (index.empty()) {
-      // kTupleSelect copies (not forwards) the top-level value.
-      continue;
-    }
-    HloValueSet& value_set = pair.second;
-    changed |=
-        value_set.AssignUnionOf({&GetValueSet(select->operand(1), index),
-                                 &GetValueSet(select->operand(2), index)});
-  }
-  return changed;
-}
-
 bool HloDataflowAnalysis::UpdateTupleValueSet(HloInstruction* tuple) {
   CHECK_EQ(tuple->opcode(), HloOpcode::kTuple);
   bool changed = false;
@@ -1138,8 +1117,6 @@ bool HloDataflowAnalysis::UpdateInstructionValueSet(
       return UpdateCopyValueSet(instruction);
     case HloOpcode::kGetTupleElement:
       return UpdateGetTupleElementValueSet(instruction);
-    case HloOpcode::kTupleSelect:
-      return UpdateTupleSelectValueSet(instruction);
     case HloOpcode::kTuple:
       return UpdateTupleValueSet(instruction);
     case HloOpcode::kParameter:
@@ -1360,7 +1337,6 @@ Status HloDataflowAnalysis::InitializeInstructionValueSets() {
           }
           break;
         case HloOpcode::kCopy:
-        case HloOpcode::kTupleSelect:
         case HloOpcode::kTuple:
           // These instructions only define their top-level values. Any other
           // values flow from their operands.
@@ -1459,7 +1435,7 @@ Status HloDataflowAnalysis::InitializeInstructionValueSets() {
     }
   }
 
-  return Status::OK();
+  return OkStatus();
 }
 
 void HloDataflowAnalysis::OptimizePhiValues() {
@@ -1588,7 +1564,7 @@ Status HloDataflowAnalysis::Verify() const {
     }
   }
 
-  return Status::OK();
+  return OkStatus();
 }
 
 bool HloDataflowAnalysis::DoesNotUseOperandBuffer(
@@ -1740,6 +1716,16 @@ GetFusionInstructionInPlaceInputOutputPairs(const HloInstruction* instruction) {
 HloDataflowAnalysis::GetInPlaceInputOutputPairs(
     const HloInstruction* instruction) {
   if (IsInPlaceOperation(instruction->opcode())) {
+    const HloScatterInstruction* scatter =
+        DynCast<HloScatterInstruction>(instruction);
+    if (scatter && scatter->scatter_operand_count() > 1) {
+      std::vector<std::pair<HloOperandIndex, ShapeIndex>> pairs;
+      pairs.reserve(scatter->scatter_operand_count());
+      for (int i = 0, n = scatter->scatter_operand_count(); i < n; ++i) {
+        pairs.emplace_back(HloOperandIndex{i, {}}, ShapeIndex{i});
+      }
+      return pairs;
+    }
     return {{HloOperandIndex{0, {}}, {}}};
   } else if (instruction->opcode() == HloOpcode::kCollectivePermute &&
              instruction->operands().size() == 4) {
@@ -1847,7 +1833,7 @@ bool HloDataflowAnalysis::CanShareOperandBufferWithUser(
   }
 
   if (can_share_buffer_ != nullptr) {
-    if (absl::optional<bool> hint =
+    if (std::optional<bool> hint =
             can_share_buffer_(user, operand, user_index)) {
       return *hint;
     }

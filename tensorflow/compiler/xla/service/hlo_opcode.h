@@ -138,8 +138,9 @@ namespace xla {
   V(kRngGetAndUpdateState, "rng-get-and-update-state", 0)                      \
   V(kRngBitGenerator, "rng-bit-generator", 1)                                  \
   V(kRoundNearestAfz, "round-nearest-afz", 1)                                  \
+  V(kRoundNearestEven, "round-nearest-even", 1)                                \
   V(kRsqrt, "rsqrt", 1)                                                        \
-  V(kScatter, "scatter", 3)                                                    \
+  V(kScatter, "scatter", kHloOpcodeIsVariadic)                                 \
   V(kSelect, "select", 3)                                                      \
   V(kSelectAndScatter, "select-and-scatter", 3)                                \
   V(kSend, "send", 2)                                                          \
@@ -158,7 +159,6 @@ namespace xla {
   V(kTranspose, "transpose", 1)                                                \
   V(kTriangularSolve, "triangular-solve", 2)                                   \
   V(kTuple, "tuple", kHloOpcodeIsVariadic)                                     \
-  V(kTupleSelect, "tuple-select", 3)                                           \
   V(kWhile, "while", 1)
 
 enum class HloOpcode {
@@ -190,7 +190,7 @@ bool HloOpcodeIsVariadic(HloOpcode opcode);
 
 // Returns the arity of opcode. If the opcode is variadic,
 // returns nullopt.
-absl::optional<int> HloOpcodeArity(HloOpcode opcode);
+std::optional<int> HloOpcodeArity(HloOpcode opcode);
 
 // Returns true if the given opcode is one of kAsyncStart, kAsyncUpdate, or
 // kAsyncDone.

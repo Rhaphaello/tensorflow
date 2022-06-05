@@ -297,13 +297,14 @@ xla::gpu::NcclCollectiveConfig GetNcclCollectiveConfig(lmhlo::AllToAllOp op,
                                                        int /*num_partitions*/) {
   // TODO(b/180174349): LMHLO AllToAll incorrectly has use_global_device_ids
   // attribute and it should be removed.
-  return xla::gpu::GetNcclCollectiveConfigForMlir(op, absl::nullopt);
+  return xla::gpu::GetNcclCollectiveConfigForMlir(op, std::nullopt);
 }
 
 xla::gpu::NcclCollectiveConfig GetNcclCollectiveConfig(
     lmhlo::CollectivePermuteOp op, int replica_count, int num_partitions) {
   return xla::gpu::NcclCollectivePermuteThunk::GetNcclCollectivePermuteConfig(
-      op, replica_count, num_partitions);
+             op, replica_count, num_partitions)
+      .config;
 }
 
 template <class CclOpType>
@@ -363,10 +364,10 @@ bool CanImplement(lmhlo::CollectivePermuteOp op) {
 }
 
 template <class CclOpType>
-struct CclRewritePattern : tfrt::gpu::GpuAsyncOpConversionPattern<CclOpType> {
-  using typename tfrt::gpu::GpuAsyncOpConversionPattern<CclOpType>::OpAdaptor;
-  using tfrt::gpu::GpuAsyncOpConversionPattern<
-      CclOpType>::GpuAsyncOpConversionPattern;
+struct CclRewritePattern : tfrt::gpu::StreamifyOpConversionPattern<CclOpType> {
+  using typename tfrt::gpu::StreamifyOpConversionPattern<CclOpType>::OpAdaptor;
+  using tfrt::gpu::StreamifyOpConversionPattern<
+      CclOpType>::StreamifyOpConversionPattern;
   FailureOr<Value> matchAndRewriteOp(
       CclOpType op, OpAdaptor adaptor, Value chain, Value stream,
       ConversionPatternRewriter& rewriter) const override {
@@ -427,7 +428,7 @@ struct CclRewritePattern : tfrt::gpu::GpuAsyncOpConversionPattern<CclOpType> {
     auto context =
         rewriter.create<tfrt::gpu::StreamGetContextOp>(op.getLoc(), stream);
     auto handle = rewriter.create<xla::gpu::CclCreateOp>(
-        op.getLoc(), ValueRange{context}, attributes);
+        op.getLoc(), ValueRange{context, chain}, attributes);
 
     out_chain_or =
         CclOpConversionRewrite(op, chain, handle, config, mapping, rewriter);

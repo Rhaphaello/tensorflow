@@ -35,18 +35,26 @@ const char kDataTypePrefix[] = "tfdtype$";
 const char kTensorShapePrefix[] = "tfshape$";
 const char kTensorPrefix[] = "tftensor$";
 
-std::string PrintShortTextFormat(const proto2::Message& message) {
+std::string PrintShortTextProto(
+    const ::tensorflow::protobuf::MessageLite& message) {
+  // proto2::TextFormat::Printer::PrintToString does not have
+  // a overload for MessageLite so here to be consistent with the existing
+  // behavior we use MessageLite::ShortDebugString().
+  return message.ShortDebugString();
+}
+
+std::string PrintShortTextProto(
+    const ::tensorflow::protobuf::Message& message) {
   std::string message_short_text;
 
-  proto2::TextFormat::Printer printer;
+  ::tensorflow::protobuf::TextFormat::Printer printer;
   printer.SetSingleLineMode(true);
   printer.SetExpandAny(true);
 
   printer.PrintToString(message, &message_short_text);
   // Single line mode currently might have an extra space at the end.
-  if (!message_short_text.empty() &&
-      message_short_text[message_short_text.size() - 1] == ' ') {
-    message_short_text.resize(message_short_text.size() - 1);
+  if (!message_short_text.empty() && message_short_text.back() == ' ') {
+    message_short_text.pop_back();
   }
 
   return message_short_text;
@@ -80,7 +88,7 @@ MangledKind GetMangledKind(absl::string_view str) {
 }
 
 string MangleShape(const TensorShapeProto& shape) {
-  return absl::StrCat(kTensorShapePrefix, PrintShortTextFormat(shape));
+  return absl::StrCat(kTensorShapePrefix, PrintShortTextProto(shape));
 }
 
 Status DemangleShape(absl::string_view str, TensorShapeProto* proto) {
@@ -88,7 +96,7 @@ Status DemangleShape(absl::string_view str, TensorShapeProto* proto) {
 }
 
 string MangleTensor(const TensorProto& tensor) {
-  return absl::StrCat(kTensorPrefix, PrintShortTextFormat(tensor));
+  return absl::StrCat(kTensorPrefix, PrintShortTextProto(tensor));
 }
 
 Status DemangleTensor(absl::string_view str, TensorProto* proto) {
@@ -106,7 +114,7 @@ Status DemangleDataType(absl::string_view str, DataType* proto) {
     return errors::FailedPrecondition(
         "Could not parse TFDataType mangled proto");
   }
-  return Status::OK();
+  return OkStatus();
 }
 
 }  // namespace mangling_util

@@ -107,6 +107,12 @@ class IrEmitterUnnested : public IrEmitter {
         absl::Span<llvm::Value* const> idx_major_to_minor,
         const llvm::Twine& name = "") const;
 
+    // Calculuate the pointee type of the llvm::Value returned by
+    // GEPIntoSharedMemory
+    llvm::Type* GEPIntoSharedMemoryType(
+        llvm::GlobalVariable* shared,
+        absl::Span<llvm::Value* const> idx_major_to_minor) const;
+
    private:
     llvm::Value* scaling;
   };
@@ -703,8 +709,8 @@ class IrEmitterUnnested : public IrEmitter {
   // to only given thread and/or block id.
   void EmitPrintfWithThreadId(
       absl::string_view fmt, absl::Span<llvm::Value* const> arguments,
-      absl::optional<int64_t> thread_id_filter = absl::nullopt,
-      absl::optional<int64_t> block_id_filter = absl::nullopt);
+      std::optional<int64_t> thread_id_filter = std::nullopt,
+      std::optional<int64_t> block_id_filter = std::nullopt);
 
   StatusOr<HloComputation*> GetOrCreateSubComputationFromRegion(
       mlir::Region* region, bool is_fusion);
